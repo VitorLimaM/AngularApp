@@ -654,3 +654,358 @@ export class Home {
 
 Run `ng serve` and make sure it still works.  
   
+## Routing
+  
+So far, we've created some components and are able to view a list of house-locations on our app. For the next step, we want to be able to click on one and view it as it's own page. Of course, we'll need a component to do so (the `details.ts` component), but there's something interesting to note. Each location has an ID, and we want to be able to use that ID to pull up the specific location's details.  
+  
+To do so, we want to use something like `my-website-address/housing-locations/1` to pull up the details for the location with the ID of 1. The mechanism to create dynamic linking like this is called routing.  
+
+Internally, we use code like `:id` to represent a URL Parameter in the path. And then we can call it by using the `RouterLink` directive. For example, in the `housing-location.ts` component, we can add a link to the details page like this:  
+
+```ts
+// src/app/housing-location/housing-location.ts
+// ...
+  template: `
+    <section class="listing">
+      <img 
+        class="listing-photo"
+        [src]="housingLocation().photo"
+        alt="Exterior photo of {{ housingLocation().name }}"
+        crossorigin
+      />
+      <h2 class="listing-heading">{{ housingLocation().name }}</h2>
+      <p class="listing-location">{{ housingLocation().city }}, {{ housingLocation().state }}</p>
+      <p><a [routerLink] = "['/details', housingLocation().id]">Learn More</a></p> 
+    </section>
+  `,
+// ...
+```
+Where `[routerLink]` is the directive to add a link to a route, and the `['/details', housingLocation().id]` is the path to the route. The `housingLocation().id` is the dynamic part of the path.  
+  
+With the link in place on the `housing-location` component, let's create the `details` component: 
+```sh
+ng generate component details --skip-tests
+```
+  
+We added the mechanism for constructing the link in the housing-location component, and we created the details component, which is the view to use for the specific housing-location. Now we need to tell Angular how to use that link to route to the details page.  
+  
+We took a look at the [documentation](https://angular.dev/tutorials/first-app/10-routing), which said to create a `routes.ts` file, but we decided to use the `app.routes.ts` that already existed.  
+  
+```ts
+// src/app/app.routes.ts
+import { Routes } from '@angular/router';
+import { Home } from './home/home';
+import { Details } from './details/details';
+
+export const routes: Routes = [
+  { path: '', component: Home },
+  { path: 'details/:id', component: Details },
+];
+```
+As you can see, the  `routes` are an array of objects where each object represent a route (a path that maps to a component).  
+  
+As you can see, the details path is `details/:id` where `:id` is the URL parameter, and it maps to the `Details` component, which is the view component for that route.  
+  
+Lastly, because we are adding routes, we need to import the `RouterOutlet` in the `app.ts` file, and update the `bootstrapApplication` in the `main.ts` file.  
+  
+```ts
+// src/app/app.ts
+// ...
+import { RouterOutlet, RouterLink } from '@angular/router';
+// ...
+  imports: [RouterOutlet, RouterLink],
+// ...
+  template: `
+  <main>
+    <a [routerLink] = "['/']">
+      <header class="brand-name">
+        <img class="brand-logo" src="images/logo.svg" alt="logo">
+      </header>
+    </a>
+    <section class="content">
+      <router-outlet />
+    </section>
+  </main>
+  `,
+// ...
+```
+
+And then we update the `main.ts` file to include the `provideRouter` provider:
+
+```ts
+// src/main.ts
+// ...
+import { provideRouter } from '@angular/router';
+import { routes } from './app/app.routes';
+// ...
+
+bootstrapApplication(App, {
+  providers: [
+    ...appConfig.providers,
+    provideRouter(routes),
+  ],
+})
+  .catch((err) => console.error(err));
+```
+
+## Bonus Exercise!  
+  
+Complete the Details component view such that it displays the details of the housing location. Use the Housing service to get the data.  
+
+## Completing the Details Component View
+
+To complete the `Details.ts` component, we need to get the `id` from the URL parameter. In order to do so, we import `ActivatedRoute` from `@angular/router`, which allows us to set the `route` property on the `Details` class. This gives us access to the `id` property, which we will want to pass to the `Housing` service through its `getHousingLocationById` method.  
+  
+```ts
+// src/app/details/details.ts
+/// ...
+export class Details {
+  route: ActivatedRoute = inject(ActivatedRoute);
+  housingService: HousingService = inject(HousingService);
+  housingLocationId: number = -1;
+  housingLocation: HousingLocationInfo | undefined;
+
+  constructor() {
+    this.housingLocationId = Number(this.route.snapshot.params['id']);
+    this.housingLocation = this.housingService.getHousingLocationById(this.housingLocationId)
+  } 
+}
+``` 
+
+Of course, we need to import `ActivatedRoute` and `HousingService` at the top of the file, and we set the template to use the `housingLocation` property.   
+  
+Our Details component file should now look like this:
+
+```ts
+// src/app/details/details.ts
+import { Component, inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { Housing as HousingService } from '../housing';
+import { HousingLocationInfo } from '../housing-location';
+
+@Component({
+  selector: 'app-details',
+  imports: [],
+  styleUrls: ['./details.css'],
+  template: `
+    <article>
+      <img
+        class="listing-photo"
+        [src]="housingLocation?.photo"
+        alt="Exterior photo of {{ housingLocation?.name }}"
+        crossorigin
+      />
+      <section class="listing-description">
+        <h2 class="listing-heading">{{ housingLocation?.name }}</h2>    
+      </section>
+    </article>
+  `,
+})
+export class Details {
+  route: ActivatedRoute = inject(ActivatedRoute);
+  housingService: HousingService = inject(HousingService);
+  housingLocationId: number = -1;
+  housingLocation: HousingLocationInfo | undefined;
+
+  constructor() {
+    this.housingLocationId = Number(this.route.snapshot.params['id']);
+    this.housingLocation = this.housingService.getHousingLocationById(this.housingLocationId)
+  }
+}
+```
+
+And of course, we add the styles to `details.css`:
+
+```css
+/* src/app/details/details.css */
+.listing-photo {
+  display: block;
+  height: 600px;
+  width: 50%;
+  object-fit: cover;
+  border-radius: 30px;
+  float: right;
+}
+.listing-heading {
+  font-size: 48pt;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+.listing-location::before {
+  content: url('/public/location-pin.svg') / '';
+}
+.listing-location {
+  font-size: 24pt;
+  margin-bottom: 15px;
+}
+.listing-features > .section-heading {
+  color: var(--secondary-color);
+  font-size: 24pt;
+  margin-bottom: 15px;
+}
+.listing-features {
+  margin-bottom: 20px;
+}
+.listing-features li {
+  font-size: 14pt;
+}
+li {
+  list-style-type: none;
+}
+.listing-apply .section-heading {
+  font-size: 18pt;
+  margin-bottom: 15px;
+}
+label,
+input {
+  display: block;
+}
+label {
+  color: var(--secondary-color);
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 12pt;
+}
+input {
+  font-size: 16pt;
+  margin-bottom: 15px;
+  padding: 10px;
+  width: 400px;
+  border-top: none;
+  border-right: none;
+  border-left: none;
+  border-bottom: solid 0.3px;
+}
+@media (max-width: 1024px) {
+  .listing-photo {
+    width: 100%;
+    height: 400px;
+  }
+}
+```
+
+And that's the Details component complete!  
+  
+## Add a Form
+
+We're going to add a form to get familiar forms! We can add a form on the details page to apply to rent a home. For now, we won't do anything with the form input values (data), other than ust log them to the console, but we will implement all of the necessary steps for handling forms.  
+  
+In the Housing service (housing.ts), we can add a method to log details to the console. It will take 3 arguments, and log a string.  
+  
+```ts
+// src/app/housing.ts
+// ...
+submitApplication(firstName: string, lastName: string, email: string) {
+  console.log(`firstName: ${firstName}, lastName: ${lastName}, email: ${email}.`);
+}
+```
+
+Now we can add the form to the template where it will be displayed. And that is the `Details` component.  
+  
+```ts
+// src/app/details/details.ts
+// ...
+
+`
+<section class="listing-apply">
+  <h2 class="section-heading">Apply now to live here</h2>
+  <form [formGroup]="applyForm" (submit)="submitForm()">  
+    <label for="first-name">First Name</label>
+    <input id="first-name" type="text" formControlName="firstName" />
+    <label for="last-name">Last Name</label>
+    <input id="last-name" type="text" formControlName="lastName" />
+    <label for="email">Email</label>
+    <input id="email" type="email" formControlName="email" />
+    <button type="submit" class="primary">Apply now</button>
+  </form>
+</section>
+`
+// ...
+```
+
+Let's pay attention to 3 parts of the form: 
+1. The `formGroup` directive on the `<form>` element. This directive is used to bind the form to the `applyForm` property on the `Details` class.  
+
+What this means is that `[formGroup]="applyForm"` is saying that the `applyForm` property of the `Details` class is now bound to this form.  
+
+2. The `formControlName` directive on the `<input>` elements. This directive is used to bind the input to the `applyForm` property on the `Details` class.  
+
+Basically the equivalent of 1, but for each input.
+
+
+3. The `(submit)` event on the `<form>` element. This is where we specify the method to be called when the form is submitted.  
+  
+We also need to add the `ReactiveFormsModule` to the `imports` array in the `@Component` decorator, and the imports at the top.
+
+```ts
+// src/app/details/details.ts
+// ...
+import { FormGroup, FormControl, ReactiveFormsModule } from '@angular/forms';
+// ...
+  imports: [ReactiveFormsModule],
+// ...
+```
+
+And finally, we want to add a property (`applyForm`)and a method (`submitForm`) to the `Details` class. 
+  
+```ts
+// src/app/details/details.ts
+// ...
+export class Details {
+  // ...
+  applyForm: FormGroup = new FormGroup({
+    firstName: new FormControl(''),
+    lastName: new FormControl(''),
+    email: new FormControl(''),
+  });
+  // ...
+  submitForm() {
+    this.housingService.submitApplication(
+      this.applyForm.value.firstName ?? '',
+      this.applyForm.value.lastName ?? '',
+      this.applyForm.value.email ?? ''
+    )
+  }
+}
+```
+
+## Add Search Filter
+
+To add a filter, we'll use the input we have on our Home component, and add a method to filter the results.  
+  
+We can add a template variable to the input, in this case we'll use `#filter`. This is just a variable that allows us to access the value of the input from the button, in the `(click)` event, like this: `(click)="filterResults(filter.value)"`.  
+
+```ts
+// src/app/home/home.ts
+// ...
+  template: `
+    <section>
+      <form>
+        <input type="text" placeholder="Filter by city" #filter />
+        <button class="primary" type="button" (click)="filterResults(filter.value)">Search</button>
+      </form>
+    </section>  
+  `,
+// ...
+```
+
+And then we add the method to the class:
+
+```ts
+// src/app/home/home.ts
+// ...
+export class Home {
+  // ...
+  filterResults(text: string) {
+    if (!text) {
+      this.filteredLocationList = this.housingLocationList;
+    }
+
+    this.filteredLocationList = this.housingLocationList.filter(
+      (housingLocation) => housingLocation.city.toLowerCase().includes(text.toLowerCase())
+    );
+  }
+}
+```
+
+And that's it! We can now search for a city and filter the results.  
